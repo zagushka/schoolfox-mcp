@@ -1,0 +1,31 @@
+{
+  "name": "schoolfox-mcp-preview",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "repository": { "type": "git", "url": "https://github.com/zagushka/schoolfox-mcp.git" },
+  "homepage": "https://github.com/zagushka/schoolfox-mcp#readme",
+  "bugs": { "url": "https://github.com/zagushka/schoolfox-mcp/issues" },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --import tsx --test test/*.test.ts",
+    "test:coverage": "npm run build && c8 node --import tsx --test test/*.test.ts",
+    "start": "node dist/src/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/client": "^2.3.1",
+    "@modelcontextprotocol/server": "^2.3.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.13",
+    "c8": "^12.0.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

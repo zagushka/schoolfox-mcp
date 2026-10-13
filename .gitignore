@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.har
+downloads/
+.schoolfox/
+_bmad/
+_bmad-output/
+__pycache__/
+*.pyc
+.DS_Store

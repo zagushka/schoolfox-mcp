@@ -1,0 +1,19 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { Client } from '@modelcontextprotocol/client';
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import { resolve } from 'node:path';
+
+test('built server initializes, lists tools, calls status, and closes via stdio', async () => {
+  const transport = new StdioClientTransport({ command:process.execPath, args:[resolve('dist/src/index.js')], env:{...process.env, SCHOOLFOX_TOKEN:'', SCHOOLFOX_EMAIL:'', SCHOOLFOX_PASSWORD:''}, stderr:'pipe' });
+  const client = new Client({ name:'stdio-test',version:'1.0.0' });
+  try {
+    await client.connect(transport);
+    const tools = (await client.listTools()).tools;
+    assert.ok(tools.some(x => x.name === 'schoolfox_status'));
+    assert.ok(tools.some(x => x.name === 'schoolfox_message_attachments'));
+    assert.ok(tools.some(x => x.name === 'schoolfox_download_message_attachment'));
+    const status = await client.callTool({name:'schoolfox_status',arguments:{}});
+    assert.equal((status.structuredContent as Record<string,unknown>).configured,false);
+  } finally { await client.close(); }
+});
