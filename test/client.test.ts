@@ -72,7 +72,7 @@ test('authentication, HTTP failure, timeout, and response shape fail safely', as
   const absent = fixture({}, {});
   await assert.rejects(absent.client.messages('classA','pupilA',1,0), /credentials_required/);
   const twoFactor = fixture({ 'POST /api/Users/login': { token:'temporary', user:{ ...login.user, twoFactorAuthActive:true } } });
-  await assert.rejects(twoFactor.client.messages('classA','pupilA',1,0), /two_factor_unsupported/);
+  await assert.rejects(twoFactor.client.messages('classA','pupilA',1,0), /two_factor_required|two_factor_setup_required/);
   assert.equal(twoFactor.calls.length,1);
   const forbidden = fixture({ 'POST /api/Users/login': login, 'GET /tables/Messages': () => new Response('',{status:403}) });
   await assert.rejects(forbidden.client.messages('classA','pupilA',1,0), (e: unknown) => e instanceof SchoolFoxError && e.status === 403);
@@ -204,7 +204,7 @@ test('login accepts only known normal 2FA state and never exposes identity after
     {...login.user,twoFactorAuthActive:false,twoFactorAuthStatus:'Required'}
   ]) {
     const {client,calls} = fixture({'POST /api/Users/login':{token:'temporary',user}});
-    await assert.rejects(client.messages('classA','pupilA',25,0), /two_factor_unsupported/);
+    await assert.rejects(client.messages('classA','pupilA',25,0), /two_factor_required|two_factor_setup_required/);
     assert.equal(client.status().writeReady,false);
     await assert.rejects(client.messages('classA','pupilA',25,0));
     assert.equal(calls.length,1);
@@ -324,7 +324,7 @@ test('authenticated 401 clears write readiness', async () => {
   assert.equal(client.status().writeReady,true);
   await assert.rejects(client.messages('classA','pupilA',25,0), /authentication_required/);
   assert.equal(client.status().writeReady,false);
-  assert.equal(calls.filter(x => x.url.pathname === '/api/Users/login').length,1);
+  assert.equal(calls.filter(x => x.url.pathname === '/api/Users/login').length,2);
 });
 
 test('failed file write removes only its newly created partial download', async () => {
@@ -406,8 +406,8 @@ test('login without a valid user ID fails before read or write requests', async 
     const {client,calls} = fixture({'POST /api/Users/login':{token:'secret-token',user:{...login.user,id}}});
     await assert.rejects(client.messages('classA','pupilA',25,0),/unexpected_response/);
     assert.equal(client.status().writeReady,false);
-    await assert.rejects(client.reply('msgA','pupilA','groupA','Text'),/unexpected_response/);
-    await assert.rejects(client.confirm('msgA','pupilA','recipientA'),/unexpected_response/);
+    await assert.rejects(client.reply('msgA','pupilA','groupA','Text'),/authentication_required/);
+    await assert.rejects(client.confirm('msgA','pupilA','recipientA'),/authentication_required/);
     assert.deepEqual(calls.map(x => `${x.init.method} ${x.url.pathname}`),['POST /api/Users/login']);
   }
 });

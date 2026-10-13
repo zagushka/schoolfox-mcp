@@ -12,14 +12,17 @@ test('configuration defaults allow an unconfigured read-only status', () => {
     timeoutMs: 10000,
     maxResponseBytes: 1048576,
     maxDownloadBytes: 10485760,
+    maxUploadBytes: 10485760,
     downloadDir: resolve('./downloads')
   });
 });
 
-test('login credentials must be complete and cannot be mixed with a token', () => {
+test('login credentials must be complete and can provide token recovery fallback', () => {
   assert.throws(() => loadConfig({ SCHOOLFOX_EMAIL: ' user@example.test ' }), /Set both SCHOOLFOX_EMAIL and SCHOOLFOX_PASSWORD/);
   assert.throws(() => loadConfig({ SCHOOLFOX_PASSWORD: 'secret' }), /Set both SCHOOLFOX_EMAIL and SCHOOLFOX_PASSWORD/);
-  assert.throws(() => loadConfig({ SCHOOLFOX_EMAIL: 'user@example.test', SCHOOLFOX_PASSWORD: 'secret', SCHOOLFOX_TOKEN: 'token' }), /Use either SCHOOLFOX_TOKEN or login credentials/);
+  const fallback = loadConfig({ SCHOOLFOX_EMAIL: 'user@example.test', SCHOOLFOX_PASSWORD: 'secret', SCHOOLFOX_TOKEN: 'token' });
+  assert.equal(fallback.token, 'token');
+  assert.equal(fallback.email, 'user@example.test');
   const login = loadConfig({ SCHOOLFOX_EMAIL: ' user@example.test ', SCHOOLFOX_PASSWORD: 'secret' });
   assert.equal(login.email, 'user@example.test');
   assert.equal(login.password, 'secret');
@@ -33,11 +36,12 @@ test('numeric limits accept boundaries and reject invalid values', () => {
   const limits = [
     ['SCHOOLFOX_TIMEOUT_MS', 1000, 60000],
     ['SCHOOLFOX_MAX_RESPONSE_BYTES', 1024, 10485760],
-    ['SCHOOLFOX_MAX_DOWNLOAD_BYTES', 1024, 104857600]
+    ['SCHOOLFOX_MAX_DOWNLOAD_BYTES', 1024, 104857600],
+    ['SCHOOLFOX_MAX_UPLOAD_BYTES', 1024, 104857600]
   ] as const;
   for (const [name, low, high] of limits) {
     for (const accepted of [low, high]) {
-      assert.equal(loadConfig({ [name]: String(accepted) })[name === 'SCHOOLFOX_TIMEOUT_MS' ? 'timeoutMs' : name === 'SCHOOLFOX_MAX_RESPONSE_BYTES' ? 'maxResponseBytes' : 'maxDownloadBytes'], accepted);
+      assert.equal(loadConfig({ [name]: String(accepted) })[name === 'SCHOOLFOX_TIMEOUT_MS' ? 'timeoutMs' : name === 'SCHOOLFOX_MAX_RESPONSE_BYTES' ? 'maxResponseBytes' : name === 'SCHOOLFOX_MAX_DOWNLOAD_BYTES' ? 'maxDownloadBytes' : 'maxUploadBytes'], accepted);
     }
     for (const rejected of [String(low - 1), String(high + 1), '1.5', 'NaN', 'Infinity']) {
       assert.throws(() => loadConfig({ [name]: rejected }), new RegExp(`${name} must be an integer`));

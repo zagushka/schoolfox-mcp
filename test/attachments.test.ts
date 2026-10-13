@@ -251,5 +251,5 @@ test('API download 401 clears validated identity', async () => {
   assert.equal(client.status().writeReady,true);
   await assert.rejects(client.downloadMessageAttachment('msgA',name),(error:unknown) => error instanceof SchoolFoxError && error.code === 'authentication_required' && error.status === 401);
   assert.equal(client.status().writeReady,false);
-  assert.equal(calls.length,4);
+  assert.equal(calls.length,7);
 });

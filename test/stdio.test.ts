@@ -13,6 +13,11 @@ test('built server initializes, lists tools, calls status, and closes via stdio'
     assert.ok(tools.some(x => x.name === 'schoolfox_status'));
     assert.ok(tools.some(x => x.name === 'schoolfox_message_attachments'));
     assert.ok(tools.some(x => x.name === 'schoolfox_download_message_attachment'));
+    assert.ok(tools.some(x => x.name === 'schoolfox_chat_history'));
+    assert.ok(tools.some(x => x.name === 'schoolfox_consultation_slots'));
+    assert.ok(tools.some(x => x.name === 'schoolfox_timetable'));
+    assert.ok(tools.some(x => x.name === 'schoolfox_activity_feed'));
+    assert.ok(tools.some(x => x.name === 'schoolfox_authenticate'));
     const status = await client.callTool({name:'schoolfox_status',arguments:{}});
     assert.equal((status.structuredContent as Record<string,unknown>).configured,false);
   } finally { await client.close(); }

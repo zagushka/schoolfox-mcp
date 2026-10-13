@@ -2,6 +2,9 @@ import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { SchoolFoxClient } from './client.js';
 import { idSchema, pageSchema, SchoolFoxError } from './contracts.js';
+import { registerAuthTools } from './auth-tools.js';
+import { registerChatTools } from './chats.js';
+import { registerSchedulingTools } from './scheduling.js';
 
 const id = idSchema;
 const target = z.object({ classId: id, pupilId: id }).extend(pageSchema.shape);
@@ -24,5 +27,8 @@ export function createServer(client: SchoolFoxClient): McpServer {
   server.registerTool('schoolfox_download_file', { description: 'Download one FoxDrive file to the configured local directory. Creates one new file and refuses overwrite.', inputSchema: z.object({ classId: id, itemId: id, fileId: id, fileName: z.string().min(1).max(128) }), annotations: { readOnlyHint: false, destructiveHint: false } }, ({ classId, itemId, fileId, fileName }) => safe(() => client.downloadFile(classId, itemId, fileId, fileName)));
   server.registerTool('schoolfox_reply', { description: 'Fetch active message detail to check reply permission, then send the exact text once in an existing SchoolFox reply group. This sends a real message to the selected pupil. Detail GET read-state effects are unverified.', inputSchema: z.object({ messageId: id, pupilId: id, groupId: id, text: z.string().min(1).max(10000) }), annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false } }, ({ messageId, pupilId, groupId, text }) => safe(() => client.reply(messageId, pupilId, groupId, text)));
   server.registerTool('schoolfox_confirm', { description: 'Record confirmation for one exact message and pupil recipient. This PATCH records the logged-in user ID and current timestamp. Signature-required messages are unsupported.', inputSchema: z.object({ messageId: id, pupilId: id, recipientId: id }), annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false } }, ({ messageId, pupilId, recipientId }) => safe(() => client.confirm(messageId, pupilId, recipientId)));
+  registerAuthTools(server, client);
+  registerChatTools(server, client.chats);
+  registerSchedulingTools(server, client.scheduling);
   return server;
 }

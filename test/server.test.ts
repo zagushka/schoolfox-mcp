@@ -17,8 +17,18 @@ test('typed tools and safe tool errors over SDK transport', async () => {
   try {
     await server.connect(serverTransport); await client.connect(clientTransport);
     const tools = (await client.listTools()).tools;
-    assert.equal(tools.length,14);
+    assert.equal(tools.length,33);
     assert.ok(tools.every(x => x.inputSchema && x.inputSchema.type === 'object'));
+    for (const name of ['schoolfox_chat_send','schoolfox_chat_send_attachment','schoolfox_book_consultation','schoolfox_cancel_consultation','schoolfox_authenticate','schoolfox_renew_session']) {
+      const tool = tools.find(x => x.name === name);
+      assert.ok(tool, `${name} is registered`);
+      assert.equal(tool.annotations?.readOnlyHint,false);
+      assert.equal(tool.annotations?.idempotentHint,false);
+    }
+    assert.equal(tools.find(x => x.name === 'schoolfox_cancel_consultation')?.annotations?.destructiveHint,true);
+    for (const name of ['schoolfox_conversations','schoolfox_consultations','schoolfox_timetable','schoolfox_activity_feed']) {
+      assert.equal(tools.find(x => x.name === name)?.annotations?.readOnlyHint,true);
+    }
     assert.equal(tools.find(x => x.name === 'schoolfox_message_detail')?.annotations?.readOnlyHint,false);
     assert.equal(tools.find(x => x.name === 'schoolfox_reply')?.annotations?.idempotentHint,false);
     assert.equal(tools.find(x => x.name === 'schoolfox_message_attachments')?.annotations?.readOnlyHint,true);
@@ -94,4 +104,62 @@ test('message attachment tools list and save a native filename over MCP transpor
     assert.equal(invalid.isError,true);
     assert.equal(calls.length,3);
   } finally { await client.close(); await server.close(); await rm(directory,{recursive:true,force:true}); }
+});
+
+test('new feature tools execute through MCP with exact target mapping and defaults', async () => {
+  const directory = await mkdtemp(join(tmpdir(),'schoolfox-feature-sdk-'));
+  const [serverTransport,clientTransport] = InMemoryTransport.createLinkedPair();
+  const calls: Array<{url:URL;init:RequestInit}> = [];
+  const conversation = {id:'chatA',organizationId:'schoolA',isClosed:false,conversationUserRole:'Member',isReadOnlyForMembers:false};
+  const fetcher = async (input: string | URL | Request, init: RequestInit = {}) => {
+    const url = new URL(String(input)); calls.push({url,init});
+    const routes: Record<string,unknown> = {
+      'GET /api/OrganizationsForConversations':[{id:'schoolA'}],
+      'GET /tables/Conversations':{results:[conversation],count:1},
+      'GET /tables/Conversations/chatA':conversation,
+      'GET /tables/ConversationMessages':{results:[{id:'chatMessageA',conversationId:'chatA',content:'Fixture'}],count:1},
+      'POST /tables/ConversationMessages':{id:'sentA',conversationId:'chatA'},
+      'GET /tables/Consultations':{results:[],count:0},
+      'GET /tables/ConsultationAppointments':{results:[],count:0},
+      'GET /tables/ConsultationAppointments/appointmentA':{id:'appointmentA',schoolId:'schoolA',consultationId:'consultA',pupilMasterDataId:'pupilA'},
+      'DELETE /api/Consultations/schoolA/consultA/Appointments/appointmentA':{},
+      'GET /tables/AllRolesSchoolClassesShort':[{id:'classA'}],
+      'GET /tables/TimeTableItems':[],
+      'GET /tables/LessonTimes':[],
+      'GET /tables/ActivityFeedItems':{results:[{id:'activityA',actionLink:'https://example.invalid/fixture'}],count:1}
+    };
+    const value=routes[`${init.method} ${url.pathname}`];
+    return value === undefined ? new Response('',{status:404}) : Response.json(value);
+  };
+  const server=createServer(new SchoolFoxClient(loadConfig({SCHOOLFOX_TOKEN:'fixture-token',SCHOOLFOX_DOWNLOAD_DIR:directory}),fetcher as typeof fetch));
+  const client=new Client({name:'feature-sdk-test',version:'1.0.0'});
+  const call=async (name:string,args:Record<string,unknown>)=>{
+    const result=await client.callTool({name,arguments:args});
+    assert.equal(result.isError,undefined,`${name}: ${JSON.stringify(result.content)}`);
+    return result.structuredContent as Record<string,unknown>;
+  };
+  try {
+    await server.connect(serverTransport);await client.connect(clientTransport);
+    await call('schoolfox_chat_organizations',{});
+    await call('schoolfox_conversations',{schoolId:'schoolA'});
+    assert.equal(calls.at(-1)?.url.searchParams.get('$top'),'25');
+    await call('schoolfox_chat_history',{schoolId:'schoolA',conversationId:'chatA'});
+    assert.equal(calls.at(-1)?.url.searchParams.get('$top'),'100');
+    await call('schoolfox_chat_send',{schoolId:'schoolA',conversationId:'chatA',content:'Exact SDK text'});
+    assert.deepEqual(JSON.parse(String(calls.at(-1)?.init.body)),{organizationId:'schoolA',conversationId:'chatA',content:'Exact SDK text',inReplyToId:null});
+    await call('schoolfox_consultations',{schoolId:'schoolA'});
+    await call('schoolfox_consultation_appointments',{schoolId:'schoolA'});
+    await call('schoolfox_cancel_consultation',{schoolId:'schoolA',consultationId:'consultA',appointmentId:'appointmentA',pupilMasterDataId:'pupilA'});
+    assert.equal(calls.at(-1)?.init.method,'DELETE');
+    const week=await call('schoolfox_timetable',{schoolId:'schoolA',classId:'classA',weekStart:'2026-10-12',timeZone:'America/New_York'});
+    assert.equal(week.timeZone,'America/New_York');
+    assert.deepEqual(week.lessons,[]);
+    const activity=await call('schoolfox_activity_feed',{schoolId:'schoolA',pupilId:'pupilA',top:10,skip:5});
+    assert.equal(activity.count,1);
+    assert.equal(calls.at(-1)?.url.searchParams.get('$skip'),'5');
+    const before=calls.length;
+    const invalid=await client.callTool({name:'schoolfox_book_consultation',arguments:{schoolId:'schoolA',consultationId:'consultA',hostId:'hostA',pupilMasterDataId:'pupilA',start:'invalid'}});
+    assert.equal(invalid.isError,true);
+    assert.equal(calls.length,before);
+  } finally {await client.close();await server.close();await rm(directory,{recursive:true,force:true});}
 });
