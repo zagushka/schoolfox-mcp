@@ -4,9 +4,11 @@ import { SchoolFoxError, idSchema, list, object, requiredId, quoteId, type Recor
 import { confirmationBody, replyBody } from './writes.js';
 import { SchoolFoxTransport } from './transport.js';
 import { ChatFeatureClient } from './chats.js';
+import { AbsenceFeatureClient } from './absences.js';
 import { SchedulingFeatureClient } from './scheduling.js';
 
 export class SchoolFoxClient extends SchoolFoxTransport {
+  readonly absences = new AbsenceFeatureClient(this, () => this.now());
   readonly chats = new ChatFeatureClient(this);
   readonly scheduling = new SchedulingFeatureClient(this);
   constructor(config: Config, fetcher: typeof fetch = fetch, now: () => Date = () => new Date()) { super(config, fetcher, now); }

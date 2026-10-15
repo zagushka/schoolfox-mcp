@@ -164,7 +164,7 @@ export class SchoolFoxTransport {
     return url;
   }
 
-  private async send(operation: string, method: Method, path: string, body?: RecordData, token?: string, binary = false): Promise<unknown> {
+  private async send(operation: string, method: Method, path: string, body?: RecordData | string[], token?: string, binary = false): Promise<unknown> {
     const url = this.url(path, operation);
     const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), this.config.timeoutMs);
     try {
@@ -192,7 +192,7 @@ export class SchoolFoxTransport {
     } finally { clearTimeout(timer); }
   }
 
-  async request(operation: string, method: Method, path: string, body?: RecordData, authenticate = true, binary = false): Promise<unknown> {
+  async request(operation: string, method: Method, path: string, body?: RecordData | string[], authenticate = true, binary = false): Promise<unknown> {
     if (authenticate) await this.ensureAuthenticated(operation);
     const sentToken = authenticate ? this.token : undefined;
     try { return await this.send(operation, method, path, body, sentToken, binary); }

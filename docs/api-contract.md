@@ -20,6 +20,12 @@ The inspected configuration on 13 October 2026 used `applicationType: SchoolFox`
 | Inventory | `GET api/Common/Inventory` |
 | Class messages / event notices | `GET tables/Messages` with fixed bounded OData queries |
 | Message detail | `GET tables/Messages/{messageId}` |
+| Pupil absence list / detail | Same scoped message routes, selecting `messageType: Absence` locally |
+| Absence teacher choices | `GET api/SchoolClasses/{classId}/Teachers` |
+| Absence overlap check | `GET api/Messages/HasAbsence` with pupil, start/end, and optional `ignoreMessageId` |
+| Save absence report | `POST tables/Messages` |
+| Send saved absence to teachers | `POST api/Messages/{messageId}/Pupils/{pupilId}/TeacherRecipients?sendAbsenceNotifications=true` with a teacher-ID array |
+| Edit absence report | `PATCH api/Messages/{messageId}` |
 | Attachment list / file | `GET api/Files/Messages/{messageId}`, optionally with encoded `fileName` |
 | Reply groups | `GET tables/InstantMessageGroups` |
 | Read replies | `GET tables/InstantMessages` |
@@ -66,6 +72,12 @@ The adapter checks metadata selection, local names, byte limits, complete HTTP 2
 
 ## New feature contracts
 
+Pupil absence reports use the parent message workflow and the five reason codes listed in the tool reference. Reads verify school, class, and pupil context. Creation and editing require an active pupil and an eligible PlusDemo, Plus, or Max plan. An overlap check precedes each write. Creating a report saves an `Absence` message, then sends a selected teacher-ID array; an empty selection is supported by the parent form. Each write is sent once. A failed delivery step reports the saved message ID and incomplete state. A lost or invalid save/PATCH response produces an explicit unknown outcome with `retrySafe: false`; it does not prove that the account was unchanged. A per-pupil in-flight guard blocks simultaneous writes within this process. Cross-client version conflict handling remains unverified.
+
+All-day input uses ISO calendar dates and an IANA timezone (default `Europe/Berlin`), covering local midnight through 23:59:59 on the final date. Timed input requires explicit offsets and permits equal start/end instants, matching the form. Editing checks fresh ownership and creator identity, keeps recipient selection, and appends the optional change note to message properties. No parent absence cancellation operation was established. These reports are separate from staff timetable changes in `TeacherAbsences`.
+
+The parent client does not establish a dedicated JSON absence list. Absence listing filters each ordinary message page locally; its source-message total includes other message types. A filtered empty page does not establish that there are no later reports.
+
 Conversations use organization scope and paged table responses. A chat send requires fresh matching detail with an open conversation and a known permitted role. Notification replies retain their original, separate contract. File uploads use multipart fields followed by a send using the returned draft message ID; a failed final send can leave that draft on the server.
 
 The observed server returns 404 for chat-message detail by ID and ignores the additional message-ID filter on the collection. Exact message lookup therefore scans conversation history with local ID checks. It checks at most 21 pages of 50 records and stops at the matching page. Messages beyond this scan limit can return `pagination_limit_exceeded`.
@@ -85,3 +97,5 @@ The selected message stayed unread after detail retrieval; listed read/signed fl
 Report API changes using sanitized field names/types, HTTP status, and required-ID comparisons. Keep identities, content, tokens, and signed links out of GitHub. Add a synthetic regression before changing an adapter.
 
 The reloaded desktop MCP exposed 33 tools and confirmed standalone chats/history, the separate activity feed, message paging, explicit session renewal, and valid empty consultation/appointment and timetable results. It exposed a chat-detail defect that blocked attachment downloads. After repair, both a fresh rebuilt SDK MCP server and the reloaded desktop connection passed exact chat-message lookup and attachment download. The desktop download also passed local PDF signature, size, and permission checks. Nonempty consultation slots, lessons/replacements, remote writes, automatic recovery after expiry, and active 2FA remain unverified live. See the [tool reference](tools.md) for inputs and account effects.
+
+On 16 October 2026, guarded authenticated reads confirmed the active pupil context, class teacher response fields, and a boolean response from the absence overlap endpoint. Absence creation and editing have not been exercised against the live account. Tool registration and behavior are verified separately with synthetic tests and a fresh server process.

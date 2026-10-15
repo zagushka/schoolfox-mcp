@@ -68,6 +68,12 @@ An MCP client can also pass environment variables directly to the process. Keep 
 | `missing_recipient_records` | Confirmation needs a valid `info` array; the observed detail response omitted it. |
 | `message_not_found` | The selected chat message was not present in the returned conversation history. |
 | `pagination_limit_exceeded` | Exact chat-message lookup reached its bounded history scan without a match. |
+| `pupil_context_unavailable` | Select school/class/pupil IDs from the same active, nondeleted Pupil inventory record. |
+| `absence_plan_unavailable` | The selected school must have the parent absence feature in PlusDemo, Plus, or Max. |
+| `absence_overlap` | A report already overlaps the selected pupil and dates. Check existing absence reports. |
+| `absence_write_in_progress` | An absence write for this pupil is already running. Inspect its result before another action. |
+| `teacher_not_available` | Select current teacher IDs from `schoolfox_absence_options`. |
+| `invalid_dates`, `invalid_interval`, `invalid_time_zone`, `invalid_local_date` | Check all-day ISO dates, timed offsets, ordering, and valid local calendar dates in the selected IANA zone. |
 | `redirect_rejected` | An unsupported redirect or host was used. |
 | `response_too_large` | A configured byte limit was exceeded. |
 | `file_exists_or_unwritable` | Use a new filename and check directory access. |
@@ -78,3 +84,11 @@ For a first account check, call status, inventory, then a bounded message page. 
 ## Chat file uploads
 
 `schoolfox_chat_send_attachment` takes an explicit absolute local `path`. It accepts one nonempty regular file, refuses a symlink at the final path, and checks the upload byte limit before upload. The path is read locally; it is not sent to SchoolFox. The filename and file contents are uploaded, then a second request sends the draft message. An incomplete result can leave a draft attachment on the server; inspect the chat before repeating the action.
+
+## Absence dates and delivery
+
+Absence tools require the school, class, and pupil IDs from one active Pupil inventory record. Report and edit tools use the first-party parent form's fixed reason codes and plan checks. Editing also needs the cached login identity to match the creator.
+
+For `allDayEvent: true`, `startDate` and `endDate` are inclusive ISO dates. `timeZone` is an IANA timezone and defaults to `Europe/Berlin`. Use the school's local timezone so daylight-saving changes produce the intended UTC bounds. For `allDayEvent: false`, supply ISO timestamps with explicit UTC offsets.
+
+Reporting saves a message before it sends teacher notifications. A delivery failure after save includes the saved message ID. If the save response is lost, the result can instead report an unknown outcome without an ID. An uncertain edit returns `updated: "unknown"` with its known message ID. All these results include `retrySafe: false`; inspect the account before another action. Automatic authentication recovery never replays a write. See the [absence workflow](tools.md#pupil-absence-reports) for recipient selection and editing limits.

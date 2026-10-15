@@ -17,19 +17,22 @@ test('typed tools and safe tool errors over SDK transport', async () => {
   try {
     await server.connect(serverTransport); await client.connect(clientTransport);
     const tools = (await client.listTools()).tools;
-    assert.equal(tools.length,33);
+    assert.equal(tools.length,38);
     assert.ok(tools.every(x => x.inputSchema && x.inputSchema.type === 'object'));
-    for (const name of ['schoolfox_chat_send','schoolfox_chat_send_attachment','schoolfox_book_consultation','schoolfox_cancel_consultation','schoolfox_authenticate','schoolfox_renew_session']) {
+    for (const name of ['schoolfox_chat_send','schoolfox_chat_send_attachment','schoolfox_book_consultation','schoolfox_cancel_consultation','schoolfox_authenticate','schoolfox_renew_session','schoolfox_report_absence','schoolfox_edit_absence']) {
       const tool = tools.find(x => x.name === name);
       assert.ok(tool, `${name} is registered`);
       assert.equal(tool.annotations?.readOnlyHint,false);
       assert.equal(tool.annotations?.idempotentHint,false);
     }
     assert.equal(tools.find(x => x.name === 'schoolfox_cancel_consultation')?.annotations?.destructiveHint,true);
-    for (const name of ['schoolfox_conversations','schoolfox_consultations','schoolfox_timetable','schoolfox_activity_feed']) {
+    for (const name of ['schoolfox_conversations','schoolfox_consultations','schoolfox_timetable','schoolfox_activity_feed','schoolfox_absences','schoolfox_absence_options']) {
       assert.equal(tools.find(x => x.name === name)?.annotations?.readOnlyHint,true);
     }
     assert.equal(tools.find(x => x.name === 'schoolfox_message_detail')?.annotations?.readOnlyHint,false);
+    assert.equal(tools.find(x => x.name === 'schoolfox_absence_detail')?.annotations?.readOnlyHint,false);
+    assert.equal(tools.find(x => x.name === 'schoolfox_report_absence')?.annotations?.destructiveHint,false);
+    assert.equal(tools.find(x => x.name === 'schoolfox_edit_absence')?.annotations?.destructiveHint,true);
     assert.equal(tools.find(x => x.name === 'schoolfox_reply')?.annotations?.idempotentHint,false);
     assert.equal(tools.find(x => x.name === 'schoolfox_message_attachments')?.annotations?.readOnlyHint,true);
     assert.equal(tools.find(x => x.name === 'schoolfox_download_message_attachment')?.annotations?.readOnlyHint,false);

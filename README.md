@@ -2,13 +2,13 @@
 
 [![CI](https://github.com/zagushka/schoolfox-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/zagushka/schoolfox-mcp/actions/workflows/ci.yml)
 
-A local TypeScript MCP server for SchoolFox. Read class messages, standalone chats, consultation appointments, weekly timetables, the activity feed, attachments, and FoxDrive items. Download selected files to your computer.
+A local TypeScript MCP server for SchoolFox. Read class messages, pupil absence reports, standalone chats, consultation appointments, weekly timetables, the activity feed, attachments, and FoxDrive items. Download selected files to your computer.
 
-The server also implements chat messages and attachment sends, consultation booking/cancellation, replies in existing notification groups, and ordinary message confirmations. These tools write to your account and have synthetic test coverage. Normal session renewal passed a live account check. Live sends, booking/cancellation, automatic expired-session recovery, and 2FA remain untested. Confirmation requires recipient records that were absent from the observed detail response.
+The server also implements absence reporting and editing, chat messages and attachment sends, consultation booking/cancellation, replies in existing notification groups, and ordinary message confirmations. These tools write to your account and have synthetic test coverage. Normal session renewal passed a live account check. Absence writes, live sends, booking/cancellation, automatic expired-session recovery, and 2FA remain untested with an account. Confirmation requires recipient records that were absent from the observed detail response.
 
 This is an independent preview. It uses the first-party web client's private API contract and is not an official SchoolFox integration. SchoolFox can change that contract.
 
-Account checks on 13 October 2026 verified standalone chats, exact chat-message lookup, PDF downloads, the activity feed, and normal session renewal through the desktop MCP. PDF checks covered size, signature, and file permissions. The synthetic suite passes 84 tests. See the [verification scope](docs/api-contract.md#live-observations) for remaining limits.
+Account checks on 13 October 2026 verified standalone chats, exact chat-message lookup, PDF downloads, the activity feed, and normal session renewal through the desktop MCP. PDF checks covered size, signature, and file permissions. Read checks on 16 October confirmed class teacher choices and the absence overlap endpoint. See the [verification scope](docs/api-contract.md#live-observations) and [test results](docs/testing.md) for remaining limits.
 
 ## Quick start
 
@@ -55,12 +55,13 @@ Restart the MCP connection after a rebuild. If `node` is not on the client's PAT
 
 ## Tools and supported features
 
-There are 33 tools:
+There are 38 tools:
 
 | Area | Tools |
 | --- | --- |
 | Configuration and inventory | `schoolfox_status`, `schoolfox_classes` |
 | Messages | `schoolfox_messages`, `schoolfox_message_detail` |
+| Pupil absence reports | `schoolfox_absences`, `schoolfox_absence_detail`, `schoolfox_absence_options`, `schoolfox_report_absence`, `schoolfox_edit_absence` |
 | Message attachments | `schoolfox_message_attachments`, `schoolfox_download_message_attachment` |
 | Existing reply threads | `schoolfox_reply_groups`, `schoolfox_replies` |
 | Event and due-date notices | `schoolfox_event_notices` |
@@ -99,9 +100,10 @@ GitHub Actions runs type checking and coverage on Node.js 22 and 24. Download ea
 - Eligible reads recover expired sessions through renewal or login fallback and retry once. `schoolfox_authenticate` completes an existing 2FA challenge. A new code can be required after re-login; 2FA enrolment/reset/disable are outside this release.
 - Most list tools use `top` from 1 to 50; chat history permits up to 100. `skip` is from 0 to 1000. Exact chat-message lookup scans at most 21 pages of 50 records and stops at the matching page. The tools accept no arbitrary URLs or OData filters.
 - Event notices contain dates from messages, excluding consultation appointments and the weekly timetable.
-- New conversation creation, new notification reply groups, signatures, absence reports, surveys, FoxDrive uploads/file changes, archives, and FoxPay are not implemented. Existing chat attachment upload is supported.
+- New conversation creation, new notification reply groups, signatures, absence cancellation, surveys, FoxDrive uploads/file changes, archives, and FoxPay are not implemented. Existing chat attachment upload is supported.
 - Reads send no explicit mark-as-read request. General server-side GET effects remain unknown. The tested message stayed unread after detail retrieval; that sample does not prove the same behavior for every message.
 - Chat sends, appointment booking/cancellation, replies, and confirmation are separate writes. Each remote write is sent once; uncertain results are not retried. Invoke them only for the user's exact intended target and action. Attachment sending has an upload step and a send step; a failure can leave a draft.
+- Absence reporting saves a message, then sends it to the selected teachers. A failed second step can leave a saved report. Check the returned message ID before taking another action. All-day reports use local dates and an IANA timezone; timed reports require explicit UTC offsets. See the [absence workflow](docs/tools.md#pupil-absence-reports).
 - Timetable changes are relevant teacher absence/replacement records; a versioned history of timetable edits was not found. Set the timetable school timezone when it differs from `Europe/Berlin`.
 - Downloads refuse overwrite and unsafe local filenames. Class-message and chat attachments accept one redirect to the observed HTTPS file host without forwarding API credentials. FoxDrive downloads reject redirects.
 

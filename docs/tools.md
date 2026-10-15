@@ -4,7 +4,7 @@ Use returned IDs, limited to 128 letters, digits, underscores, or hyphens. Most 
 
 ## Inputs, effects, and live checks
 
-Live status describes authorized account checks on 13 October 2026. Automated tests use synthetic data and are separate from these observations.
+Live status describes authorized account checks on 13 and 16 October 2026. Automated tests use synthetic data and are separate from these observations.
 
 | Tool | Required inputs | Optional inputs | Effect | Live status |
 | --- | --- | --- | --- | --- |
@@ -50,6 +50,44 @@ The following tools use separate SchoolFox sections. The reloaded desktop MCP co
 | `schoolfox_activity_feed` | `schoolId`, `pupilId` | `top`, `skip` | Reads the separate parent activity feed; never follows action links. |
 
 Downloads change local files. Detail is conservatively marked as not read-only because general server-side GET effects are unknown. Read tools send no explicit receipt.
+
+## Pupil absence reports
+
+These tools use the parent absence workflow. All five take `schoolId`, `classId`, and `pupilId` from the same active Pupil inventory record. Use its `id` as `pupilId`; pupil master-data IDs from consultations are different.
+
+| Tool | Additional required inputs | Optional inputs | Effect |
+| --- | --- | --- | --- |
+| `schoolfox_absences` | None | `top`, `skip` | Reads a message page and selects its absence reports. |
+| `schoolfox_absence_detail` | `messageId` | None | Reads one exact absence and checks its pupil/class/school context. |
+| `schoolfox_absence_options` | None | None | Lists the reason codes and current class teacher choices. |
+| `schoolfox_report_absence` | `reason`, `startDate`, `endDate`, `allDayEvent`, `teacherIds` | `timeZone` | Checks for overlap, saves an absence, then sends its teacher notifications. |
+| `schoolfox_edit_absence` | `messageId`, `reason`, `startDate`, `endDate`, `allDayEvent` | `timeZone`, `changeNote` | Checks a fresh owned report and overlap, then changes it once. |
+
+The five reason codes are `ABSENCE_ILLNESS`, `ABSENCE_DOCTOR`, `ABSENCE_PRIVATE_APPOINTMENT`, `ABSENCE_FAMILY_REASONS`, and `ABSENCE_OTHER`. The parent form uses these codes rather than free-text medical details.
+
+Call `schoolfox_absence_options` and select exact returned teacher IDs. Pass them explicitly in `teacherIds`. An empty array is allowed, as in the parent form; the tool does not select all teachers automatically. The send call still enables SchoolFox absence notifications for an empty selection. Reporting and editing require the PlusDemo, Plus, or Max plan and remain subject to SchoolFox permissions.
+
+For an all-day report, use ISO calendar dates and an IANA timezone. The default timezone is `Europe/Berlin`. Both dates are inclusive; the server receives local midnight on the first day through 23:59:59 on the final day, converted to UTC with daylight-saving changes.
+
+```json
+{"schoolId":"SCHOOL_ID","classId":"CLASS_ID","pupilId":"PUPIL_ID","reason":"ABSENCE_DOCTOR","startDate":"2026-10-19","endDate":"2026-10-19","allDayEvent":true,"timeZone":"Europe/Berlin","teacherIds":["TEACHER_ID"]}
+```
+
+For a timed report, set `allDayEvent` to `false` and use ISO timestamps with explicit offsets, such as `2026-10-19T09:00:00+02:00` through `2026-10-19T10:00:00+02:00`. The end must not precede the start. Equal instants are accepted by the parent form. `timeZone` determines all-day boundaries; timed input already specifies its offsets.
+
+Absence listing filters ordinary message pages locally. Its source-message total includes other message types; an empty filtered page can still have later absence reports. Advance the page offset through the source messages within the supported paging limit.
+
+Reporting is a two-step write: save the message, then send it to teachers with absence notifications enabled. If the second step fails, the result contains `delivery: "incomplete"`, the saved `messageId`, a safe error, and `retrySafe: false`. Delivery can be uncertain; inspect that report before taking another action. Neither step is replayed automatically.
+
+If the save itself loses its response or returns an invalid result, the tool returns `stage: "save"`, `delivery: "unknown"`, and `retrySafe: false`. A message ID is included only when one was returned and validated; it can be unavailable. A failed or invalid PATCH response similarly returns the known `messageId`, `updated: "unknown"`, and `retrySafe: false`. These outcomes do not establish that the account was unchanged. Check the pupil's reports in SchoolFox before submitting another write.
+
+Reading the report can confirm its saved dates and reason. It cannot prove which teachers received a notification. Review delivery in the SchoolFox application before any manual resend. This integration has no recipient-resend or absence-cancellation tool.
+
+Editing requires a validated login identity matching the report's creator and fresh ownership checks. It preserves recipients and unrelated message fields, and adds the optional `changeNote` to the report's change history. No parent cancellation/deletion contract was established. Marking a message done does not cancel an absence.
+
+Only one absence write for a pupil can run at a time in this server process. Changes made in another client still depend on SchoolFox's concurrency checks. The edit sends the fresh message's version field when present; server conflict handling remains unverified.
+
+Read routes were checked on 16 October 2026. Absence reporting and editing are covered by synthetic tests only; no live absence was submitted during implementation.
 
 ## Select a pupil and message
 
@@ -106,7 +144,7 @@ For confirmation, read the selected message detail and choose `recipientId` only
 | Creating a new conversation group | Not implemented; sending to existing conversations is supported |
 | Creating a reply group | Not implemented |
 | Signature-required confirmation / FoxSign | Not implemented |
-| Absence reports | Not implemented |
+| Pupil absence cancellation/deletion | Not implemented; no parent cancellation contract was established |
 | Surveys and event registration | Not implemented |
 | Versioned history of timetable edits | Not verified in the web client; relevant absence/replacement changes are supported |
 | Archives and exports | Not implemented |

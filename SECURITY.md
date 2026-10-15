@@ -12,4 +12,6 @@ Requests use a fixed API origin. Attachment redirects are limited to one observe
 
 Chat upload tools read an explicit absolute local file path. Only invoke them for the selected file and intended participants. Remote writes are sent once; failed writes are never replayed during authentication recovery. A two-step upload/send failure can leave a draft on the server. 2FA enrolment and security resets are not performed.
 
+Absence tools handle a pupil's attendance dates and reason code. Reporting saves a message before sending teacher notifications; a failed second step can leave that saved report. Editing requires matching ownership and creator identity. Do not repeat an uncertain write automatically or treat message deletion as absence cancellation.
+
 Tests and CI use synthetic data. Public source and coverage artifacts must not contain credentials, recordings, or downloaded documents. See [verification limits](docs/api-contract.md).

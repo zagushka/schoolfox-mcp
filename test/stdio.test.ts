@@ -10,6 +10,10 @@ test('built server initializes, lists tools, calls status, and closes via stdio'
   try {
     await client.connect(transport);
     const tools = (await client.listTools()).tools;
+    assert.equal(tools.length,38);
+    for (const name of ['schoolfox_absences','schoolfox_absence_detail','schoolfox_absence_options','schoolfox_report_absence','schoolfox_edit_absence']) {
+      assert.ok(tools.some(x => x.name === name),`${name} is registered in the built server`);
+    }
     assert.ok(tools.some(x => x.name === 'schoolfox_status'));
     assert.ok(tools.some(x => x.name === 'schoolfox_message_attachments'));
     assert.ok(tools.some(x => x.name === 'schoolfox_download_message_attachment'));
